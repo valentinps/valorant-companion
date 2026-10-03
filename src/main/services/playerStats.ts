@@ -11,6 +11,7 @@ import { ApiError } from '../core/errors'
 import { Player } from '../endpoints'
 import type { CompetitiveUpdate, MatchDetails, MmrResponse } from '../endpoints/player'
 import type { ServiceContext } from './context'
+import { cardArt } from './profile'
 import { queueName } from './queues'
 
 const MAX_MATCHES = 20
@@ -48,21 +49,22 @@ interface Identity {
  * Everything is cached briefly so flipping between game modes doesn't hammer Riot's rate limits.
  */
 export class PlayerStatsService {
-  private mmr = new TtlCache<string, MmrResponse>(2 * MINUTE)
   private history = new TtlCache<string, History>(MINUTE)
   private compUpdates = new TtlCache<string, CompetitiveUpdate[]>(MINUTE)
   private identity = new TtlCache<string, Identity>(10 * MINUTE)
 
   constructor(private readonly ctx: ServiceContext) {}
 
-  async profile(puuid: string, queue: string | null, count: number): Promise<PlayerProfileView> {
+  /** @param hidden the player is in streamer mode: show their stats, but never look up their name. */
+  async profile(puuid: string, queue: string | null, count: number, hidden = false): Promise<PlayerProfileView> {
     const { assets, players, session } = this.ctx
     const isSelf = puuid === session.requireInfo().puuid
+    const showName = isSelf || !hidden
     const n = Math.min(Math.max(1, Math.floor(count)), MAX_MATCHES)
 
     const [player, mmr, history, rrChanges, identity] = await Promise.all([
-      players.resolveOne(puuid),
-      this.getMmr(puuid).catch(() => null),
+      showName ? players.resolveOne(puuid) : null,
+      this.ctx.ranks.getMmr(puuid).catch(() => null),
       this.getHistory(puuid, queue, n),
       this.getCompUpdates(puuid, queue, n)
         .then((list) => new Map(list.map((m) => [m.MatchID, m.RankedRatingEarned])))
@@ -75,7 +77,7 @@ export class PlayerStatsService {
       .map((d) => (d ? lineFor(d, puuid) : null))
       .filter((l): l is PlayerMatchLine => l !== null)
 
-    const latest = mmr?.LatestCompetitiveUpdate
+    const competitive = mmr ? await this.ctx.ranks.fromMmr(mmr) : null
 
     const matches: ProfileMatch[] = await Promise.all(
       lines.map(async (l) => {
@@ -104,19 +106,17 @@ export class PlayerStatsService {
       isSelf,
       cardImage: identity.cardImage,
       accountLevel: identity.accountLevel,
-      rank: mmr ? await assets.rank(latest?.TierAfterUpdate ?? 0) : null,
-      rankedRating: latest ? latest.RankedRatingAfterUpdate : null,
+      rank: competitive?.rank ?? null,
+      rankedRating: competitive?.rankedRating ?? null,
       rankUnavailable: mmr === null,
       peakRank: mmr ? await this.peakRank(puuid, mmr).catch(() => null) : null,
       stats: summarize(lines),
       topAgents: await topAgents(lines, this.ctx),
       matches,
-      trackerUrl: `https://tracker.gg/valorant/profile/riot/${encodeURIComponent(`${player.gameName}#${player.tagLine}`)}/overview`
+      trackerUrl: player
+        ? `https://tracker.gg/valorant/profile/riot/${encodeURIComponent(`${player.gameName}#${player.tagLine}`)}/overview`
+        : null
     }
-  }
-
-  private getMmr(puuid: string): Promise<MmrResponse> {
-    return this.mmr.getOrLoadWithFallback(puuid, () => this.ctx.api.call(Player.getMmr, { puuid }))
   }
 
   private getHistory(puuid: string, queue: string | null, n: number): Promise<History> {
@@ -191,7 +191,7 @@ export class PlayerStatsService {
       const match = latest ? await this.matchDetails(latest.MatchID) : null
       const p = match?.players.find((x) => x.subject === puuid)
       return {
-        cardImage: p?.playerCard ? `https://media.valorant-api.com/playercards/${p.playerCard}/wideart.png` : null,
+        cardImage: p?.playerCard ? cardArt(p.playerCard).wide : null,
         accountLevel: p?.accountLevel ?? null
       }
     })

@@ -158,3 +158,22 @@ export const getAccountXp = endpoint<{ puuid: string }, { Subject: string; Progr
   method: 'GET',
   path: (p) => `/account-xp/v1/players/${p.puuid}`
 })
+
+export interface PlayerLoadout {
+  Subject: string
+  Identity: {
+    PlayerCardID: string
+    PlayerTitleID: string
+    AccountLevel: number
+    PreferredLevelBorderID: string
+    HideAccountLevel: boolean
+  }
+  Incognito: boolean
+}
+
+/** What a player has equipped: card, title, level border (guns and sprays too, unused here). */
+export const getLoadout = endpoint<{ puuid: string }, PlayerLoadout>({
+  host: 'pd',
+  method: 'GET',
+  path: (p) => `/personalization/v3/players/${p.puuid}/playerloadout`
+})

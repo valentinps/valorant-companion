@@ -1,6 +1,7 @@
 import type { LiveMatchView, LiveTeam } from '../../shared/types'
 import { isNotFound } from '../core/errors'
 import { Coregame } from '../endpoints'
+import type { CoregamePlayer } from '../endpoints/coregame'
 import type { ServiceContext } from './context'
 import { buildSlots } from './players'
 import { queueName } from './queues'
@@ -11,7 +12,7 @@ export class LiveMatchService {
 
   /** Returns null when you are not in a match. */
   async get(): Promise<LiveMatchView | null> {
-    const { api, assets, players, session } = this.ctx
+    const { api, assets, players, ranks, session } = this.ctx
     const { puuid } = session.requireInfo()
 
     let matchId: string
@@ -28,22 +29,32 @@ export class LiveMatchService {
       a === allyTeamId ? -1 : b === allyTeamId ? 1 : 0
     )
 
+    /** The badge only carries a rank in competitive games; elsewhere it's 0, so look the rank up. */
+    const competitiveTier = async (p: CoregamePlayer): Promise<number> => {
+      const badge = p.SeasonalBadgeInfo?.Rank ?? 0
+      if (badge > 0) return badge
+      return ranks
+        .competitive(p.Subject)
+        .then((c) => c.rank.tier)
+        .catch(() => 0)
+    }
+
     const teams: LiveTeam[] = await Promise.all(
       teamIds.map(async (teamId) => {
-        const isAlly = teamId === allyTeamId
         const members = match.Players.filter((p) => p.TeamID === teamId && !p.IsCoach)
         return {
           teamId,
-          isAlly,
+          isAlly: teamId === allyTeamId,
           players: await buildSlots(
-            members.map((p) => ({
-              puuid: p.Subject,
-              identity: p.PlayerIdentity,
-              characterId: p.CharacterID,
-              selectionState: 'locked' as const,
-              // Ranks are only shown for your own team - no opponent scouting.
-              tier: isAlly ? (p.SeasonalBadgeInfo?.Rank ?? 0) : null
-            })),
+            await Promise.all(
+              members.map(async (p) => ({
+                puuid: p.Subject,
+                identity: p.PlayerIdentity,
+                characterId: p.CharacterID,
+                selectionState: 'locked' as const,
+                tier: await competitiveTier(p)
+              }))
+            ),
             puuid,
             players,
             assets

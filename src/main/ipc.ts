@@ -1,22 +1,14 @@
 import { ipcMain, type WebContents } from 'electron'
-import { COMMAND_CHANNEL_PREFIX, EVENT_CHANNEL_PREFIX, type Events, type IpcResult } from '../shared/ipc'
+import { COMMAND_CHANNEL_PREFIX, EVENT_CHANNEL_PREFIX, type Events } from '../shared/ipc'
 import type { Backend } from './backend'
-import { AppError } from './core/errors'
+import { runCommand } from './handlers'
 
-/** Exposes every handler over IPC. Errors are returned as data so the UI gets a clean message. */
+/** Exposes every handler over IPC. */
 export function registerIpc(backend: Backend): void {
-  for (const [command, handler] of Object.entries(backend.handlers)) {
-    ipcMain.handle(COMMAND_CHANNEL_PREFIX + command, async (_event, ...args: unknown[]): Promise<IpcResult<unknown>> => {
-      try {
-        const data = await (handler as (...a: unknown[]) => unknown)(...args)
-        return { ok: true, data: data ?? null }
-      } catch (err) {
-        const code = err instanceof AppError ? err.code : 'UNKNOWN'
-        const message = err instanceof Error ? err.message : String(err)
-        console.error(`[ipc] ${command} failed:`, message)
-        return { ok: false, error: { code, message } }
-      }
-    })
+  for (const command of Object.keys(backend.handlers)) {
+    ipcMain.handle(COMMAND_CHANNEL_PREFIX + command, (_event, ...args: unknown[]) =>
+      runCommand(backend.handlers, command, args)
+    )
   }
 }
 

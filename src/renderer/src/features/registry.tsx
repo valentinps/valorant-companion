@@ -1,11 +1,13 @@
 import type { ComponentType } from 'react'
 import type { AppStatus, GamePhase } from '../../../shared/types'
-import { AgentIcon, FriendsIcon, LiveIcon, PartyIcon, ProfileIcon, StoreIcon } from '../components/icons'
+import { AgentIcon, BookmarkIcon, FriendsIcon, LiveIcon, PartyIcon, PhoneIcon, ProfileIcon, StoreIcon } from '../components/icons'
 import { AgentSelectPage } from './agent-select/AgentSelectPage'
 import { FriendsPage } from './friends/FriendsPage'
 import { LiveMatchPage } from './live/LiveMatchPage'
 import { OverviewPage } from './overview/OverviewPage'
 import { PartyPage } from './party/PartyPage'
+import { RemotePage } from './remote/RemotePage'
+import { SavedPage } from './saved/SavedPage'
 import { StorePage } from './store/StorePage'
 
 export interface Feature {
@@ -17,6 +19,8 @@ export interface Feature {
   focusOn?: GamePhase
   /** Show a "live" marker in the rail when true. */
   isActive?: (status: AppStatus) => boolean
+  /** Only shown in the desktop window, never on a paired phone. */
+  desktopOnly?: boolean
 }
 
 /**
@@ -27,6 +31,7 @@ export const FEATURES: Feature[] = [
   { id: 'overview', label: 'Overview', icon: ProfileIcon, page: OverviewPage, focusOn: 'MENUS' },
   { id: 'party', label: 'Party', icon: PartyIcon, page: PartyPage },
   { id: 'friends', label: 'Friends', icon: FriendsIcon, page: FriendsPage },
+  { id: 'saved', label: 'Saved', icon: BookmarkIcon, page: SavedPage },
   {
     id: 'agent-select',
     label: 'Agent select',
@@ -43,5 +48,6 @@ export const FEATURES: Feature[] = [
     focusOn: 'INGAME',
     isActive: (s) => s.phase === 'INGAME'
   },
-  { id: 'store', label: 'Store', icon: StoreIcon, page: StorePage }
+  { id: 'store', label: 'Store', icon: StoreIcon, page: StorePage },
+  { id: 'remote', label: 'Phone', icon: PhoneIcon, page: RemotePage, desktopOnly: true }
 ]

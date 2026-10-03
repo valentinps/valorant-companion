@@ -1,78 +1,66 @@
-import { useCommand } from '../../api'
-import { useOpenMatch, useOpenProfile } from '../overlays/Overlays'
-import { EmptyState, ErrorNote, Loading, PageHeader, RankBadge, formatDuration } from '../../components/ui'
-import type { MatchSummary } from '../../../../shared/types'
+import { useState, type CSSProperties } from 'react'
+import { useCommand, useStatus } from '../../api'
+import { useOpenProfile } from '../overlays/Overlays'
+import { ErrorNote, Loading, RankBadge } from '../../components/ui'
+import type { ProfileView } from '../../../../shared/types'
+import { DEFAULT_QUEUE, ProfileBody, QueueTabs } from '../profile/ProfileParts'
+
+/** The most matches Riot's history returns per request, so the widest window the stats can cover. */
+const MATCH_COUNT = 20
 
 export function OverviewPage() {
+  const puuid = useStatus().player?.puuid
   const profile = useCommand('profile.get', [], { intervalMs: 120_000 })
-  const matches = useCommand('matches.recent', [10], { intervalMs: 120_000 })
+  const [queue, setQueue] = useState<string | null>(DEFAULT_QUEUE)
+  const stats = useCommand('players.profile', [puuid ?? '', queue, MATCH_COUNT], {
+    intervalMs: 120_000,
+    enabled: puuid !== undefined
+  })
   const p = profile.data
-  const openProfile = useOpenProfile()
-  const openMatch = useOpenMatch()
+  const s = stats.data?.puuid === puuid ? stats.data : undefined
 
   return (
-    <div className="page">
-      <PageHeader title="Overview" />
-
-      {p ? (
-        <section className="profile">
-          <div className="profile-id">
-            <h2 className="profile-name">
-              {p.player.gameName}
-              <span className="tag">#{p.player.tagLine}</span>
-            </h2>
-            <p className="muted">
-              Level {p.accountLevel} on the {p.region.toUpperCase()} server
-            </p>
-            <button
-              className="secondary"
-              onClick={() => openProfile({ puuid: p.player.puuid, name: `${p.player.gameName}#${p.player.tagLine}` })}
-            >
-              View my stats
-            </button>
-          </div>
-          <RankBadge rank={p.rank} rr={p.rankedRating} size="lg" />
-        </section>
-      ) : profile.loading ? (
-        <Loading />
-      ) : null}
+    <div className="page page-wide">
+      {p ? <OverviewHero profile={p} /> : profile.loading ? <div className="overview-hero is-loading" /> : null}
       <ErrorNote message={profile.error} />
 
-      <h3 className="section-title">Recent matches</h3>
-      <ErrorNote message={matches.error} />
-      {matches.data?.length === 0 && <EmptyState title="No matches yet">Play a game and it will show up here.</EmptyState>}
-      {matches.data && matches.data.length > 0 && (
-        <ol className="match-list">
-          {matches.data.map((m) => (
-            <MatchRow
-              key={m.matchId}
-              match={m}
-              onOpen={p ? () => openMatch({ matchId: m.matchId, perspectivePuuid: p.player.puuid }) : undefined}
-            />
-          ))}
-        </ol>
-      )}
+      <div className="overview-toolbar">
+        <h3 className="section-title">Your form</h3>
+        <QueueTabs queue={queue} onChange={setQueue} />
+      </div>
+      <ErrorNote message={stats.error} />
+      {stats.loading && !s && <Loading />}
+      {s && <ProfileBody profile={s} refreshing={stats.loading} />}
     </div>
   )
 }
 
-function MatchRow({ match, onOpen }: { match: MatchSummary; onOpen?: () => void }) {
-  const rr = match.rrChange
-  const tone = rr == null ? '' : rr > 0 ? 'gain' : rr < 0 ? 'loss' : ''
+/** Your equipped banner, title, level and current rank. */
+function OverviewHero({ profile: p }: { profile: ProfileView }) {
+  const openProfile = useOpenProfile()
+  const banner: CSSProperties | undefined = p.card ? { backgroundImage: `url(${p.card.wide})` } : undefined
   return (
-    <li className="match-row" onClick={onOpen} onKeyDown={(e) => e.key === 'Enter' && onOpen?.()} tabIndex={onOpen ? 0 : undefined} role={onOpen ? 'button' : undefined} aria-label={onOpen ? `Open match on ${match.map.name}` : undefined}>
-      <div className="match-map" style={match.map.icon ? { backgroundImage: `url(${match.map.icon})` } : undefined}>
-        <span>{match.map.name}</span>
+    <section className="overview-hero" style={banner}>
+      {p.card && <img className="overview-card" src={p.card.large} alt="Equipped player card" />}
+      <div className="overview-id">
+        {p.title && <span className="overview-title">{p.title}</span>}
+        <h1 className="overview-name">
+          {p.player.gameName}
+          <span className="tag">#{p.player.tagLine}</span>
+        </h1>
+        <p className="muted">
+          Level {p.accountLevel}, {p.region.toUpperCase()} server
+        </p>
+        <button
+          className="secondary"
+          onClick={() => openProfile({ puuid: p.player.puuid, name: `${p.player.gameName}#${p.player.tagLine}` })}
+        >
+          Open full profile
+        </button>
       </div>
-      <div className="match-meta">
-        <span>{match.queue}</span>
-        <span className="muted">
-          {new Date(match.startedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
-          {match.durationMs > 0 && `, ${formatDuration(match.durationMs)}`}
-        </span>
+      <div className="overview-rank">
+        <RankBadge rank={p.rank} rr={p.rankedRating} size="lg" />
       </div>
-      <RankBadge rank={match.rankAfter} rr={match.rrAfter} />
-      <span className={`rr-change ${tone}`}>{rr == null ? '' : `${rr > 0 ? '+' : ''}${rr}`}</span>
-    </li>
+    </section>
   )
 }

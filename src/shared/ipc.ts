@@ -14,7 +14,10 @@ import type {
   MatchSummary,
   PartyView,
   PregameView,
+  SavedPlayer,
   ProfileView,
+  RemoteMode,
+  RemoteView,
   ResourceName,
   StoreView
 } from './types'
@@ -46,11 +49,24 @@ export interface Commands {
   'matches.details': (matchId: string, perspectivePuuid: string) => MatchDetailView
 
   /** Stats for any player, computed from their recent matches. queue: null = all modes. */
-  'players.profile': (puuid: string, queue: string | null, count: number) => PlayerProfileView
+  'players.profile': (puuid: string, queue: string | null, count: number, hidden?: boolean) => PlayerProfileView
+
+  /** Players the user keeps track of, newest first. Local only: makes no Riot requests. */
+  'saved.list': () => SavedPlayer[]
+  /** hidden: the player is in streamer mode; their name is then never looked up or stored. */
+  'saved.add': (puuid: string, hidden?: boolean) => void
+  'saved.remove': (puuid: string) => void
 
   'friends.list': () => FriendView[]
   'friends.invite': (puuid: string) => void
   'friends.requestJoin': (puuid: string) => void
+
+  /** Phone remote: serves this UI to a phone. PC only; phones can't call these. */
+  'remote.get': () => RemoteView
+  'remote.setEnabled': (enabled: boolean) => RemoteView
+  'remote.setMode': (mode: RemoteMode) => RemoteView
+  /** Sign out every paired phone. */
+  'remote.resetKey': () => RemoteView
 }
 
 /** Events pushed from main to the UI. */

@@ -1,8 +1,20 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import type { CommandArgs, CommandName, CommandResult } from '../../shared/ipc'
+import type { RendererApi } from '../../shared/ipc'
 import type { AppStatus, ResourceName } from '../../shared/types'
+import { createRemoteApi, type RemoteApi, type RemoteConnection } from './remoteApi'
 
-export const api = window.api
+/** Set when this UI runs in a phone's browser, talking to the PC over the network. */
+export const remote: RemoteApi | null = window.api ? null : createRemoteApi()
+
+export const api: RendererApi = window.api ?? remote!
+
+/** Phone only: whether the PC is reachable. Always 'online' on the PC. */
+export function useRemoteConnection(): RemoteConnection {
+  const [state, setState] = useState<RemoteConnection>(remote?.connection() ?? 'online')
+  useEffect(() => remote?.onConnection(setState), [])
+  return state
+}
 
 export const StatusContext = createContext<AppStatus | null>(null)
 

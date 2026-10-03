@@ -5,7 +5,8 @@ import type { ApiClient } from '../core/apiClient'
 import { AppError } from '../core/errors'
 import { basicAuth } from '../core/lockfile'
 import type { RiotSession } from '../core/session'
-import { Local } from '../endpoints'
+import { isNotFound } from '../core/errors'
+import { Coregame, Local } from '../endpoints'
 import type { RawPresence } from '../endpoints/local'
 import { findOwnPresence } from './presence'
 
@@ -16,6 +17,8 @@ export interface GameStateEvents {
 }
 
 const POLL_INTERVAL_MS = 3000
+/** How often to check whether agent select has turned into a match (the loading screen). */
+const LOADING_PROBE_MS = 3000
 
 // Local WebSocket events we listen to (the event name is the endpoint path with "/" -> "_").
 const PRESENCE_EVENT = 'OnJsonApiEvent_chat_v4_presences'
@@ -38,6 +41,15 @@ export class GameStateTracker extends EventEmitter<GameStateEvents> {
   private timer: NodeJS.Timeout | null = null
   private socket: WebSocket | null = null
   private ticking = false
+  /** What presence last said, before the loading screen correction below. */
+  private presencePhase: GamePhase = 'GAME_CLOSED'
+  /**
+   * Presence keeps saying "agent select" through the whole loading screen, but the match
+   * already exists on Riot's side. Set once it does, so the live match shows up during loading.
+   */
+  private matchStarted = false
+  private lastProbe = 0
+  private probing = false
 
   constructor(
     private readonly session: RiotSession,
@@ -70,6 +82,7 @@ export class GameStateTracker extends EventEmitter<GameStateEvents> {
       if (!this.session.isConnected) await this.connect()
       if (this.session.isConnected) {
         await this.refreshPresence()
+        await this.probeLoadingScreen()
         // Reconnect the event socket if it dropped while the client stayed up.
         if (this.session.isConnected && !this.socket) this.openSocket()
       }
@@ -113,12 +126,34 @@ export class GameStateTracker extends EventEmitter<GameStateEvents> {
     const own = findOwnPresence(presences, puuid)
     // Presence updates from the WebSocket may only contain other players.
     if (!own && !presences.some((p) => p.puuid === puuid)) return
+    this.presencePhase = own ? own.loopState : 'GAME_CLOSED'
+    if (this.presencePhase !== 'PREGAME') this.matchStarted = false
     this.update({
       ...this.current,
-      phase: own ? own.loopState : 'GAME_CLOSED',
+      phase: this.presencePhase === 'PREGAME' && this.matchStarted ? 'INGAME' : this.presencePhase,
       partyId: own?.partyId ?? null,
       error: null
     })
+  }
+
+  /** While presence says agent select, check whether the match has been created yet. */
+  private async probeLoadingScreen(force = false): Promise<void> {
+    const puuid = this.session.info?.puuid
+    if (!puuid || this.presencePhase !== 'PREGAME' || this.matchStarted || this.probing) return
+    if (!force && Date.now() - this.lastProbe < LOADING_PROBE_MS) return
+    this.probing = true
+    this.lastProbe = Date.now()
+    try {
+      await this.api.call(Coregame.getCoregamePlayer, { puuid })
+      if (this.presencePhase !== 'PREGAME') return
+      this.matchStarted = true
+      this.update({ ...this.current, phase: 'INGAME' })
+      this.emit('resource', 'coregame')
+    } catch (err) {
+      if (!isNotFound(err)) console.warn('[state] loading screen check failed:', errorMessage(err))
+    } finally {
+      this.probing = false
+    }
   }
 
   private openSocket(): void {
@@ -161,6 +196,8 @@ export class GameStateTracker extends EventEmitter<GameStateEvents> {
       for (const [pattern, resource] of RMS_RESOURCES) {
         if (pattern.test(uri)) this.emit('resource', resource)
       }
+      // The match was just created: no need to wait for the next probe.
+      if (/ares-core-game/.test(uri)) void this.probeLoadingScreen(true)
     }
   }
 
@@ -176,6 +213,8 @@ export class GameStateTracker extends EventEmitter<GameStateEvents> {
   private handleDisconnect(): void {
     this.closeSocket()
     this.session.disconnect()
+    this.presencePhase = 'GAME_CLOSED'
+    this.matchStarted = false
     this.update(emptyStatus('DISCONNECTED'))
   }
 

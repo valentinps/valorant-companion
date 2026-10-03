@@ -1,4 +1,4 @@
-import type { ProfileView } from '../../shared/types'
+import type { PlayerCardArt, ProfileView } from '../../shared/types'
 import { Player } from '../endpoints'
 import type { ServiceContext } from './context'
 
@@ -6,22 +6,30 @@ export class ProfileService {
   constructor(private readonly ctx: ServiceContext) {}
 
   async get(): Promise<ProfileView> {
-    const { api, assets, players, session } = this.ctx
+    const { api, assets, players, ranks, session } = this.ctx
     const { puuid, region } = session.requireInfo()
 
-    const [player, mmr, xp] = await Promise.all([
+    const [player, competitive, xp, loadout] = await Promise.all([
       players.resolveOne(puuid),
-      api.call(Player.getMmr, { puuid }),
-      api.call(Player.getAccountXp, { puuid })
+      ranks.competitive(puuid),
+      api.call(Player.getAccountXp, { puuid }),
+      api.call(Player.getLoadout, { puuid }).catch(() => null)
     ])
+    const identity = loadout?.Identity
 
-    const latest = mmr.LatestCompetitiveUpdate
     return {
       player,
       accountLevel: xp.Progress.Level,
-      rank: await assets.rank(latest?.TierAfterUpdate ?? 0),
-      rankedRating: latest?.RankedRatingAfterUpdate ?? 0,
-      region
+      rank: competitive.rank,
+      rankedRating: competitive.rankedRating,
+      region,
+      card: identity?.PlayerCardID ? cardArt(identity.PlayerCardID) : null,
+      title: identity?.PlayerTitleID ? await assets.title(identity.PlayerTitleID) : null
     }
   }
+}
+
+export function cardArt(cardId: string): PlayerCardArt {
+  const base = `https://media.valorant-api.com/playercards/${cardId}`
+  return { wide: `${base}/wideart.png`, large: `${base}/largeart.png` }
 }

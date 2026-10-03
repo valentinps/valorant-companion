@@ -13,14 +13,19 @@ import { useOpenProfile, type MatchTarget } from '../overlays/Overlays'
 
 type Tab = 'scoreboard' | 'rounds'
 
-export function MatchView({ matchId, perspectivePuuid, onClose }: MatchTarget & { onClose: () => void }) {
+export function MatchView({
+  matchId,
+  perspectivePuuid,
+  onClose,
+  onBack
+}: MatchTarget & { onClose: () => void; onBack?: () => void }) {
   const match = useCommand('matches.details', [matchId, perspectivePuuid])
   const [tab, setTab] = useState<Tab>('scoreboard')
   const m = match.data
   const hasRounds = (m?.rounds.length ?? 0) > 0
 
   return (
-    <Modal label="Match details" onClose={onClose}>
+    <Modal label="Match details" onClose={onClose} onBack={onBack}>
       {!m && match.loading && (
         <div className="modal-loading">
           <Loading />

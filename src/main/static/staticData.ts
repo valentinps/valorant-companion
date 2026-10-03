@@ -8,7 +8,7 @@ import type { MapInfo, RankInfo } from '../../shared/types'
 
 const BASE = 'https://valorant-api.com/v1'
 // Bump when the cached data shape changes, so old cache files are ignored.
-const CACHE_SCHEMA = 3
+const CACHE_SCHEMA = 4
 
 export interface AbilityData {
   /** "Ability1" | "Ability2" | "Grenade" | "Ultimate" | "Passive" */
@@ -62,6 +62,7 @@ interface StaticDataSet {
   weapons: Record<string, WeaponData> // keyed by lower-case weapon UUID
   acts: Record<string, ActData> // keyed by season UUID
   tierSets: Record<string, Record<number, RankInfo>> // keyed by competitive tiers UUID
+  titles: Record<string, string> // keyed by lower-case player title UUID; untitled entries left out
 }
 
 type ApiResponse<T> = { status: number; data: T }
@@ -116,6 +117,13 @@ export class StaticData {
     return (await this.load()).acts[seasonId.toLowerCase()] ?? null
   }
 
+  /** The act running right now (lower-case season UUID), or null if the data doesn't cover today. */
+  async currentActId(now = Date.now()): Promise<string | null> {
+    const acts = Object.entries((await this.load()).acts)
+    const current = acts.find(([, a]) => a.start !== null && a.end !== null && a.start <= now && now < a.end)
+    return current?.[0] ?? null
+  }
+
   /** The rank as it was named in a given act (before Episode 5 there was no Ascendant, for example). */
   async rankInAct(tier: number, seasonId: string): Promise<RankInfo> {
     const data = await this.load()
@@ -144,6 +152,11 @@ export class StaticData {
     return (await this.load()).currencies[id] ?? { name: 'Unknown currency', icon: null }
   }
 
+  /** Text of an equipped player title, e.g. "Sharpshooter"; null for none or unknown. */
+  async title(id: string): Promise<string | null> {
+    return (await this.load()).titles[id.toLowerCase()] ?? null
+  }
+
   private async fetchOrReadCache(): Promise<StaticDataSet> {
     const { riotClientVersion } = await get<{ riotClientVersion: string }>('/version')
     const cachePath = this.cacheDir ? join(this.cacheDir, `static-v${CACHE_SCHEMA}-${riotClientVersion}.json`) : null
@@ -165,7 +178,7 @@ export class StaticData {
   }
 
   private async fetchAll(version: string): Promise<StaticDataSet> {
-    const [agents, maps, tierSets, skins, contentTiers, currencies, weapons, seasons, compSeasons] = await Promise.all([
+    const [agents, maps, tierSets, skins, contentTiers, currencies, weapons, seasons, compSeasons, titles] = await Promise.all([
       get<RawAgent[]>('/agents?isPlayableCharacter=true'),
       get<RawMap[]>('/maps'),
       get<RawTierSet[]>('/competitivetiers'),
@@ -174,7 +187,8 @@ export class StaticData {
       get<RawCurrency[]>('/currencies'),
       get<RawWeapon[]>('/weapons'),
       get<RawSeason[]>('/seasons'),
-      get<RawCompetitiveSeason[]>('/seasons/competitive')
+      get<RawCompetitiveSeason[]>('/seasons/competitive'),
+      get<RawTitle[]>('/playertitles')
     ])
 
     const rarity = new Map(contentTiers.map((t) => [t.uuid, color(t.highlightColor)]))
@@ -233,6 +247,9 @@ export class StaticData {
       skinLevels,
       currencies: Object.fromEntries(
         currencies.map((c) => [c.uuid, { name: titleCase(c.displayName), icon: c.displayIcon }])
+      ),
+      titles: Object.fromEntries(
+        titles.filter((t) => t.titleText).map((t) => [t.uuid.toLowerCase(), t.titleText as string])
       ),
       weapons: Object.fromEntries(
         weapons.map((w) => [w.uuid.toLowerCase(), { name: w.displayName, icon: w.killStreamIcon ?? w.displayIcon }])
@@ -296,6 +313,11 @@ interface RawContentTier {
   uuid: string
   highlightColor: string
 }
+interface RawTitle {
+  uuid: string
+  titleText: string | null
+}
+
 interface RawCurrency {
   uuid: string
   displayName: string

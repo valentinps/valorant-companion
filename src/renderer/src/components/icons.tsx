@@ -54,3 +54,16 @@ export const StoreIcon = () => (
     <path d="M7 7.5V6a3 3 0 0 1 6 0v1.5" />
   </svg>
 )
+
+export const BookmarkIcon = ({ filled = false }: { filled?: boolean }) => (
+  <svg {...base} fill={filled ? 'currentColor' : 'none'}>
+    <path d="M5.5 3.5h9v13.2L10 13.4l-4.5 3.3z" />
+  </svg>
+)
+
+export const PhoneIcon = () => (
+  <svg {...base}>
+    <rect x="5.5" y="2.5" width="9" height="15" rx="1.8" />
+    <path d="M8.8 14.8h2.4" />
+  </svg>
+)

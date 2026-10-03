@@ -64,7 +64,17 @@ export function ErrorNote({ message }: { message: string | null | undefined }) {
 }
 
 export function PlayerName({ slot, onOpen }: { slot: Pick<TeamSlot, 'displayName' | 'isSelf'>; onOpen?: () => void }) {
-  if (slot.displayName === null) return <span className="player-name hidden-name">Hidden (streamer mode)</span>
+  if (slot.displayName === null) {
+    const label = 'Hidden (streamer mode)'
+    if (onOpen) {
+      return (
+        <button className="player-name player-link hidden-name" onClick={onOpen} title="View profile">
+          {label}
+        </button>
+      )
+    }
+    return <span className="player-name hidden-name">{label}</span>
+  }
   const [name, tag] = slot.displayName.split('#')
   const content = (
     <>
@@ -85,4 +95,16 @@ export function PlayerName({ slot, onOpen }: { slot: Pick<TeamSlot, 'displayName
 
 export function Loading() {
   return <div className="loading" aria-label="Loading" />
+}
+
+/** "just now", "5 min ago", "3 days ago"... */
+export function timeAgo(ts: number, now = Date.now()): string {
+  const min = Math.round((now - ts) / 60_000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min} min ago`
+  const h = Math.round(min / 60)
+  if (h < 24) return `${h} h ago`
+  const d = Math.round(h / 24)
+  if (d < 30) return `${d} ${d === 1 ? 'day' : 'days'} ago`
+  return new Date(ts).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 }

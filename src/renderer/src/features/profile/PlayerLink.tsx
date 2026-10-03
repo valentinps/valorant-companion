@@ -9,12 +9,11 @@ interface Props {
 
 /**
  * A player name that opens their profile when clicked.
- * Players in streamer mode (displayName null) stay anonymous and unclickable.
- * Only use this for yourself, friends, party members and teammates, not opponents.
+ * Players in streamer mode (displayName null) open a profile that keeps their name hidden.
  */
 export function PlayerLink({ puuid, displayName, isSelf }: Props) {
   const openProfile = useOpenProfile()
   const slot = { displayName, isSelf }
-  if (displayName === null) return <PlayerName slot={slot} />
+  if (displayName === null) return <PlayerName slot={slot} onOpen={() => openProfile({ puuid, hidden: true })} />
   return <PlayerName slot={slot} onOpen={() => openProfile({ puuid, name: displayName })} />
 }

@@ -25,7 +25,7 @@ export interface AppStatus {
 }
 
 /** A Riot resource that changed server-side; UI panels refetch when their resource changes. */
-export type ResourceName = 'pregame' | 'party' | 'coregame' | 'friends'
+export type ResourceName = 'pregame' | 'party' | 'coregame' | 'friends' | 'saved' | 'remote'
 
 export interface RankInfo {
   tier: number
@@ -34,12 +34,23 @@ export interface RankInfo {
   color: string | null
 }
 
+/** Art for an equipped player card. */
+export interface PlayerCardArt {
+  /** Wide banner, as on the in-game scoreboard. */
+  wide: string
+  /** Tall portrait. */
+  large: string
+}
+
 export interface ProfileView {
   player: PlayerRef
   accountLevel: number
   rank: RankInfo
   rankedRating: number
   region: string
+  /** Equipped card and title; null when Riot didn't return the loadout. */
+  card: PlayerCardArt | null
+  title: string | null
 }
 
 export interface AgentOption {
@@ -208,7 +219,8 @@ export interface PeakRank {
 
 export interface PlayerProfileView {
   puuid: string
-  player: PlayerRef
+  /** null for a player in streamer mode: their name is never looked up. */
+  player: PlayerRef | null
   isSelf: boolean
   cardImage: string | null
   accountLevel: number | null
@@ -222,7 +234,31 @@ export interface PlayerProfileView {
   stats: ProfileStats | null
   topAgents: AgentUsage[]
   matches: ProfileMatch[]
-  trackerUrl: string
+  /** null when the player is hidden (tracker.gg needs their Riot ID). */
+  trackerUrl: string | null
+}
+
+// ---------- Saved players ----------
+
+/** What a saved player looked like the last time their profile was loaded (competitive tab). */
+export interface SavedSnapshot {
+  at: number
+  cardImage: string | null
+  accountLevel: number | null
+  rank: RankInfo | null
+  rankedRating: number | null
+  peakRank: RankInfo | null
+  stats: ProfileStats | null
+  mainAgent: { id: string; name: string; icon: string } | null
+}
+
+export interface SavedPlayer {
+  puuid: string
+  /** null when saved from streamer mode: the name is never looked up. */
+  player: PlayerRef | null
+  hidden: boolean
+  savedAt: number
+  snapshot: SavedSnapshot | null
 }
 
 // ---------- Friends ----------
@@ -342,4 +378,35 @@ export interface MatchDetailView {
   outcome: MatchOutcome | null
   teams: MatchTeamLine[]
   rounds: RoundLine[]
+}
+
+// ---------- Phone remote ----------
+
+export interface RemoteLink {
+  /** Network adapter the address belongs to, e.g. "Wi-Fi". */
+  label: string
+  /** Full pairing link, key included. */
+  url: string
+  /** QR code of the link, as an SVG document. */
+  qrSvg: string
+}
+
+export type RemoteMode = 'internet' | 'lan'
+
+export type TunnelState = 'off' | 'downloading' | 'starting' | 'ready' | 'error'
+
+export interface RemoteView {
+  enabled: boolean
+  mode: RemoteMode
+  /** Internet mode only. progress: 0-100 while cloudflared downloads (first use). */
+  tunnel: { state: TunnelState; progress: number | null; error: string | null }
+  running: boolean
+  port: number | null
+  error: string | null
+  /** Phones currently connected. */
+  connectedClients: number
+  /** Last request from another device since the server started; null if none ever reached this PC. */
+  lastVisit: { address: string; at: number } | null
+  /** Internet mode: the tunnel address, once ready. LAN mode: one per network address of this PC, best first. */
+  links: RemoteLink[]
 }

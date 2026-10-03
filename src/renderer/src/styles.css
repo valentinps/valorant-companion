@@ -19,6 +19,8 @@
   --font: 'Bahnschrift', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --radius-sm: 3px;
   --radius: 6px;
+  /* Height of the custom title bar; 0 when there is none (phone remote). */
+  --titlebar-h: 0px;
 
   color-scheme: dark;
 }
@@ -32,6 +34,94 @@ body,
 #root {
   height: 100%;
   margin: 0;
+}
+
+/* ---------- Window frame ---------- */
+
+.app-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-frame > :not(.titlebar) {
+  flex: 1;
+  min-height: 0;
+}
+
+.has-titlebar {
+  --titlebar-h: 36px;
+}
+
+/* Drag area across the top. The minimise / maximise / close buttons are Windows' own, drawn on the right
+   in matching colours (see TITLE_BAR in src/main/index.ts). */
+.titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--titlebar-h);
+  /* Keep clear of the native buttons. */
+  padding: 0 calc(100% - env(titlebar-area-x, 0px) - env(titlebar-area-width, calc(100% - 140px)) + 12px) 0 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.titlebar-mark {
+  width: 10px;
+  height: 10px;
+  background: var(--commit);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+.titlebar-name {
+  font-size: 12px;
+  font-weight: 600;
+  font-stretch: condensed;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.titlebar-phase {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* ---------- Scrollbars ---------- */
+
+/* Thin bars in the panel colours: a line-coloured thumb that brightens on hover, no arrows. */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  background-clip: padding-box;
+  border: 3px solid transparent;
+  border-radius: 6px;
+  min-height: 40px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #3a4d5c;
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--muted);
+}
+
+::-webkit-scrollbar-button {
+  display: none;
 }
 
 body {
@@ -360,58 +450,297 @@ img {
 
 /* ---------- Overview ---------- */
 
-.profile {
+.page-wide {
+  max-width: 1180px;
+}
+
+/* Equipped card banner across the top, faded into the page like the modal heroes. */
+.overview-hero {
+  position: relative;
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-end;
   gap: 24px;
+  min-height: 220px;
   padding: 24px 28px;
   border-radius: var(--radius);
+  background: var(--surface) center 35% / cover;
+  overflow: hidden;
+}
+
+.overview-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(0deg, var(--bg) 0%, rgb(15 25 35 / 0.55) 55%, rgb(15 25 35 / 0.15)),
+    linear-gradient(90deg, rgb(15 25 35 / 0.6), transparent 60%);
+}
+
+.overview-hero > * {
+  position: relative;
+}
+
+.overview-hero.is-loading {
   background: var(--surface);
 }
 
-.profile-name {
-  font-size: 30px;
+.overview-card {
+  width: 96px;
+  aspect-ratio: 268 / 640;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 0 1px rgb(236 232 225 / 0.25), 0 8px 24px rgb(0 0 0 / 0.5);
 }
 
-.profile-id p {
-  margin: 4px 0 0;
+.overview-id {
+  flex: 1;
+  min-width: 0;
 }
 
-.match-list {
+.overview-title {
+  display: inline-block;
+  margin-bottom: 6px;
+  color: var(--ally);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.overview-name {
+  font-size: 48px;
+  line-height: 0.95;
+  font-weight: 700;
+  text-shadow: 0 2px 12px rgb(0 0 0 / 0.5);
+}
+
+.overview-id p {
+  margin: 6px 0 0;
+}
+
+.overview-id .secondary {
+  background: rgb(22 34 45 / 0.8);
+}
+
+.overview-rank {
+  align-self: flex-end;
+}
+
+.overview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 28px 0 14px;
+}
+
+.overview-toolbar .section-title {
+  margin: 0;
+}
+
+@media (max-width: 760px) {
+  .overview-card {
+    display: none;
+  }
+
+  .overview-hero {
+    flex-wrap: wrap;
+  }
+
+  .overview-name {
+    font-size: 36px;
+  }
+}
+
+/* ---------- Saved players ---------- */
+
+.saved-grid {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 6px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
 }
 
-.match-row {
-  display: grid;
-  grid-template-columns: 180px 1fr auto 56px;
-  align-items: center;
-  gap: 18px;
-  padding-right: 16px;
-  border-radius: var(--radius-sm);
+.saved-card {
+  position: relative;
+}
+
+.saved-open {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
   background: var(--surface);
+  text-align: left;
   overflow: hidden;
 }
 
-.match-map {
-  height: 58px;
-  display: flex;
-  align-items: flex-end;
-  padding: 6px 12px;
-  background: var(--surface-2) center / cover;
-  font-weight: 600;
-  font-stretch: condensed;
-  font-size: 18px;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
+.saved-open:hover {
+  border-color: var(--line);
+  background: var(--surface-2);
 }
 
-.match-meta {
+.saved-banner {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 92px;
+  padding: 12px 14px 10px;
+  background: var(--surface-2) center 35% / cover;
+}
+
+.saved-banner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, var(--surface) 0%, rgb(15 25 35 / 0.35) 75%);
+}
+
+.saved-banner > * {
+  position: relative;
+}
+
+.saved-id {
   display: grid;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.saved-name {
+  font-size: 22px;
+  line-height: 1.05;
+  font-stretch: condensed;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-agent {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: rgb(15 25 35 / 0.6);
+}
+
+.saved-ranks {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px 4px;
+}
+
+.saved-peak {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.saved-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin: 0;
+  padding: 8px 14px;
+}
+
+.saved-stats dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.saved-stats dd {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  font-stretch: condensed;
+  font-variant-numeric: tabular-nums;
+}
+
+.saved-empty {
+  margin: 0;
+  padding: 10px 14px;
   font-size: 14px;
+}
+
+.saved-footer {
+  margin-top: auto;
+  padding: 6px 14px 12px;
+  font-size: 12px;
+}
+
+.saved-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgb(236 232 225 / 0.25);
+  border-radius: 99px;
+  background: rgb(15 25 35 / 0.75);
+  font-size: 18px;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.saved-card:hover .saved-remove,
+.saved-remove:focus-visible {
+  opacity: 1;
+}
+
+.saved-remove:hover {
+  border-color: var(--loss);
+  color: var(--loss);
+}
+
+.saved-note {
+  margin: 16px 0 0;
+  font-size: 13px;
+}
+
+/* ---------- Save button (profile window) ---------- */
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.save-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 14px;
+}
+
+.save-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.save-button:hover:not(:disabled) {
+  border-color: var(--muted);
+}
+
+.save-button.is-saved {
+  border-color: var(--ally);
+  color: var(--ally);
 }
 
 .rr-change {
@@ -1152,19 +1481,11 @@ button.small:hover:not(:disabled) {
   list-style: none;
 }
 
-.match-row[role='button'] {
-  cursor: pointer;
-}
-
-.match-row[role='button']:hover {
-  background: var(--surface-2);
-}
-
 /* ---------- Modal windows (profile, match) ---------- */
 
 .modal-backdrop {
   position: fixed;
-  inset: 0;
+  inset: var(--titlebar-h) 0 0;
   z-index: 20;
   display: grid;
   place-items: center;
@@ -1193,7 +1514,8 @@ button.small:hover:not(:disabled) {
   }
 }
 
-.modal-close {
+.modal-close,
+.modal-back {
   position: absolute;
   top: 14px;
   right: 16px;
@@ -1208,12 +1530,19 @@ button.small:hover:not(:disabled) {
   font-size: 14px;
 }
 
-.modal-close span {
+.modal-back {
+  right: auto;
+  left: 16px;
+}
+
+.modal-close span,
+.modal-back span {
   font-size: 20px;
   line-height: 1;
 }
 
-.modal-close:hover {
+.modal-close:hover,
+.modal-back:hover {
   background: var(--surface-2);
   border-color: var(--text);
 }
@@ -1253,6 +1582,11 @@ button.small:hover:not(:disabled) {
   font-size: 48px;
   line-height: 0.95;
   font-weight: 700;
+}
+
+.modal-hero h2.hidden-name {
+  font-size: 34px;
+  font-weight: 400;
 }
 
 .modal-hero p {
@@ -1637,4 +1971,383 @@ button.small:hover:not(:disabled) {
 .stat-peak .peak-note {
   font-size: 14px;
   min-height: 44px;
+}
+
+/* ---------- Phone remote (the PC's pairing page) ---------- */
+
+.remote-intro {
+  max-width: 560px;
+}
+
+.remote-intro p {
+  margin: 0 0 10px;
+}
+
+.remote-pair {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 36px;
+  align-items: start;
+}
+
+.remote-qr {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 16px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.remote-qr img {
+  width: 240px;
+  height: 240px;
+  border-radius: var(--radius-sm);
+  image-rendering: pixelated;
+}
+
+.remote-steps ol {
+  margin: 0 0 14px;
+  padding-left: 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.remote-note {
+  margin: 0 0 18px;
+  font-size: 14px;
+}
+
+.remote-networks {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+
+.remote-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.remote-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.remote-dot.is-on {
+  background: var(--ready);
+}
+
+.remote-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.remote-help {
+  margin: 22px 0 0;
+  font-size: 14px;
+}
+
+.remote-mode {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+
+.remote-pending {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.remote-url {
+  display: block;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12px;
+  word-break: break-all;
+  user-select: all;
+}
+
+@media (max-width: 760px) {
+  .remote-pair {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Phone: shown over the app while the PC can't be reached. */
+.remote-banner {
+  flex: none;
+  padding: 8px 16px;
+  background: var(--commit);
+  color: #fff;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ---------- Phone layout ----------
+   The phone remote serves this same UI, so narrow screens get a bottom tab bar and single columns. */
+
+@media (max-width: 640px) {
+  body {
+    font-size: 14px;
+  }
+
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+
+  .content {
+    overflow-x: hidden;
+  }
+
+  .shell > .content {
+    grid-row: 1;
+  }
+
+  .rail {
+    grid-row: 2;
+    padding: 0 0 env(safe-area-inset-bottom);
+    border-right: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .rail ul {
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(64px, 1fr);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .rail-item {
+    flex-direction: column;
+    gap: 3px;
+    padding: 8px 4px 7px;
+    font-size: 11px;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .rail-item.is-active {
+    box-shadow: inset 0 2px 0 var(--text);
+  }
+
+  .rail-item .live-dot {
+    position: absolute;
+    top: 7px;
+    right: calc(50% - 18px);
+    width: 7px;
+    height: 7px;
+  }
+
+  .rail-status {
+    display: none;
+  }
+
+  .page {
+    padding: 18px 16px 32px;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+
+  .empty {
+    padding: 28px 20px;
+  }
+
+  .overview-hero {
+    min-height: 0;
+    padding: 18px 16px;
+  }
+
+  .overview-name {
+    font-size: 30px;
+  }
+
+  .overview-toolbar,
+  .modal-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .segmented {
+    max-width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .segmented button {
+    flex: none;
+    padding: 6px 10px;
+  }
+
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-peak,
+  /* Fifth stat would sit alone on its row. */
+  .stat-grid > .stat:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+
+  .profile-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .profile-match {
+    grid-template-columns: 32px minmax(0, 1fr) auto auto 30px;
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .profile-match > img,
+  .profile-match > .agent-placeholder {
+    width: 32px;
+    height: 32px;
+  }
+
+  .live-teams {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .team-row {
+    gap: 10px;
+    padding: 8px 10px 8px 8px;
+  }
+
+  .queue-panel {
+    flex-wrap: wrap;
+    padding: 16px;
+  }
+
+  .friend {
+    grid-template-columns: 10px minmax(0, 1fr) auto;
+    gap: 10px;
+  }
+
+  .friend > :last-child {
+    grid-column: 2 / -1;
+  }
+
+  .search {
+    width: 100%;
+  }
+
+  .saved-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Agent select */
+  .pregame-banner {
+    min-height: 120px;
+    padding: 16px;
+  }
+
+  .pregame-banner h1 {
+    font-size: 40px;
+  }
+
+  .pregame-timer {
+    font-size: 40px;
+  }
+
+  .pregame-body {
+    grid-template-columns: 1fr;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .agent-grid {
+    grid-template-columns: repeat(auto-fill, minmax(68px, 1fr));
+  }
+
+  .lock-bar {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 16px;
+  }
+
+  /* Profile and match windows take the whole screen. */
+  .modal-backdrop {
+    padding: 0;
+  }
+
+  .modal {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .modal-hero {
+    min-height: 130px;
+    padding: 56px 16px 14px;
+    flex-wrap: wrap;
+  }
+
+  .modal-hero h2 {
+    font-size: 32px;
+  }
+
+  .modal-toolbar {
+    padding: 12px 16px 0;
+  }
+
+  .modal-body {
+    padding: 4px 16px 24px;
+  }
+
+  .match-score {
+    font-size: 36px;
+  }
+
+  /* Scoreboards keep every column and scroll sideways instead. */
+  .team-table {
+    overflow-x: auto;
+  }
+
+  .team-table table {
+    min-width: 640px;
+  }
+
+  .econ-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .econ-row > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .kill-row {
+    grid-template-columns: 36px minmax(0, 1fr) 28px minmax(0, 1fr);
+    gap: 6px;
+    font-size: 13px;
+  }
+
+  .kill-row > :nth-child(5) {
+    display: none;
+  }
+
+  .remote-qr img {
+    width: 200px;
+    height: 200px;
+  }
 }

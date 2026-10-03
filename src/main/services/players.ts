@@ -61,7 +61,7 @@ export async function buildSlots(
       const agent = i.characterId ? await assets.agent(i.characterId) : null
       return {
         puuid: i.puuid,
-        displayName: ref ? `${ref.gameName}#${ref.tagLine}` : null,
+        displayName: ref?.gameName ? `${ref.gameName}#${ref.tagLine}` : null,
         isSelf,
         agent: agent ? { id: agent.id, name: agent.name, icon: agent.icon } : null,
         selectionState: i.selectionState,

@@ -1,8 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import type { AppStatus, GamePhase } from '../../shared/types'
-import { StatusContext, useStatusSubscription } from './api'
+import { remote, StatusContext, useRemoteConnection, useStatusSubscription } from './api'
 import { OverlayProvider } from './features/overlays/Overlays'
-import { FEATURES } from './features/registry'
+import { FEATURES as ALL_FEATURES } from './features/registry'
+
+/** Pages that manage the PC itself (pairing) aren't offered on the phone. */
+const FEATURES = remote ? ALL_FEATURES.filter((f) => !f.desktopOnly) : ALL_FEATURES
+
+if (!remote) document.documentElement.classList.add('has-titlebar')
 
 const PHASE_LABEL: Record<GamePhase, string> = {
   DISCONNECTED: 'Riot Client closed',
@@ -13,6 +18,16 @@ const PHASE_LABEL: Record<GamePhase, string> = {
 }
 
 export function App() {
+  const connection = useRemoteConnection()
+  return (
+    <div className="app-frame">
+      {remote ? connection === 'offline' && <RemoteBanner /> : <TitleBar />}
+      {connection === 'unpaired' ? <PairScreen /> : <AppContent />}
+    </div>
+  )
+}
+
+function AppContent() {
   const status = useStatusSubscription()
   if (!status) return <div className="boot" />
   if (status.phase === 'DISCONNECTED') return <ConnectScreen status={status} />
@@ -20,6 +35,40 @@ export function App() {
     <StatusContext.Provider value={status}>
       <Shell status={status} />
     </StatusContext.Provider>
+  )
+}
+
+/** Drag area for the frameless window; Windows draws its own buttons on the right. */
+function TitleBar() {
+  return (
+    <header className="titlebar">
+      <span className="titlebar-mark" aria-hidden />
+      <span className="titlebar-name">Valorant Companion</span>
+    </header>
+  )
+}
+
+/** Phone only: shown while the PC can't be reached. */
+function RemoteBanner() {
+  return (
+    <div className="remote-banner" role="status">
+      Reconnecting to your PC...
+    </div>
+  )
+}
+
+/** Phone only: opened without (or with an outdated) pairing link. */
+function PairScreen() {
+  return (
+    <div className="connect">
+      <div className="connect-card">
+        <h1>Pair this phone</h1>
+        <p>
+          On your PC, open Valorant Companion, go to <strong>Phone</strong>, turn on remote access and scan the QR code
+          with this phone's camera.
+        </p>
+      </div>
+    </div>
   )
 }
 

@@ -27,13 +27,19 @@ export class ApiClient {
       return this.session.localRequest<R>(endpoint.method, endpoint.path(params), endpoint.body?.(params))
     }
     let refreshTokens = false
+    let reauthenticated = false
     for (let attempt = 0; ; attempt++) {
       try {
         return await this.callRemote(endpoint, params, refreshTokens)
       } catch (err) {
         if (!(err instanceof ApiError) || attempt >= MAX_RETRIES) throw err
-        if (err.status === 401 && !refreshTokens) {
+        if (isRejectedToken(err) && !refreshTokens) {
           refreshTokens = true
+        } else if (isRejectedToken(err) && !reauthenticated) {
+          // A fresh token was rejected too: the Riot Client may have restarted or re-logged in.
+          reauthenticated = true
+          await this.session.reauthenticate()
+          refreshTokens = false
         } else if (err.status === 429) {
           // Riot's rate limit: wait as long as it asks (capped), then try again.
           await sleep(Math.min(err.retryAfterMs ?? 2000 * (attempt + 1), MAX_RETRY_WAIT_MS))
@@ -70,4 +76,12 @@ export class ApiClient {
         return `https://shared.${shard}.a.pvp.net`
     }
   }
+}
+
+/**
+ * Riot rejects an expired access token with 401, but also with
+ * 400 BAD_CLAIMS "Failure validating/decoding RSO Access Token".
+ */
+function isRejectedToken(err: ApiError): boolean {
+  return err.status === 401 || err.riotCode === 'BAD_CLAIMS' || /RSO Access Token/i.test(err.message)
 }

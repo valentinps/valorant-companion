@@ -70,7 +70,7 @@ export class PartyService {
         const pings = m.Pings?.map((p) => p.Ping).filter((p) => p > 0) ?? []
         return {
           puuid: m.Subject,
-          displayName: ref ? `${ref.gameName}#${ref.tagLine}` : null,
+          displayName: ref?.gameName ? `${ref.gameName}#${ref.tagLine}` : null,
           isSelf,
           isOwner: m.IsOwner === true,
           isReady: m.IsReady,
